@@ -590,6 +590,8 @@ class RRT(PathPlanner):
                 self._entity.set_qpos(qpos_cur, envs_idx=envs_idx, zero_velocity=False)
             else:
                 self._entity.set_qpos(qpos_cur, zero_velocity=False)
+            if is_plan_with_obj:
+                self.update_object(ee_link_idx, obj_link_idx, _pos, _quat, envs_idx)
             sol = torch.zeros((num_waypoints, len(envs_idx), sol.shape[-1]), dtype=gs.tc_float, device=gs.device)
             return sol, is_invalid
 
@@ -994,6 +996,8 @@ class RRTConnect(PathPlanner):
                 self._entity.set_qpos(qpos_cur, envs_idx=envs_idx, zero_velocity=False)
             else:
                 self._entity.set_qpos(qpos_cur, zero_velocity=False)
+            if is_plan_with_obj:
+                self.update_object(ee_link_idx, obj_link_idx, _pos, _quat, envs_idx)
             return torch.zeros(num_waypoints, len(envs_idx), sol.shape[-1], device=gs.device), is_invalid
 
         mask = rrt_connect_valid_mask(res_idx)

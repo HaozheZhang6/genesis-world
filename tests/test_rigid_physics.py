@@ -2993,6 +2993,43 @@ def test_path_planning_avoidance(backend, n_envs, show_viewer, tol):
 
 
 @pytest.mark.required
+@pytest.mark.parametrize("backend", [gs.cpu])
+def test_plan_path_with_entity_preserves_state_on_failure(backend, tol):
+    # A failed plan_path(with_entity=...) must not move the attached object (#2715): the
+    # failure early-return restored the robot qpos but not the carried object. The goal
+    # below targets a pose under the floor, so the goal config is in collision and the
+    # single planning attempt fails deterministically regardless of the planner's RNG.
+    scene = gs.Scene(
+        sim_options=gs.options.SimOptions(dt=0.01),
+        rigid_options=gs.options.RigidOptions(box_box_detection=True),
+        show_viewer=False,
+    )
+    scene.add_entity(gs.morphs.Plane())
+    cube = scene.add_entity(gs.morphs.Box(size=(0.05, 0.05, 0.05), pos=(0.3, 0.1, 0.35)))
+    franka = scene.add_entity(gs.morphs.MJCF(file="xml/franka_emika_panda/panda.xml"))
+    scene.build()
+
+    hand = franka.get_link("hand")
+    qpos_goal = franka.inverse_kinematics(link=hand, pos=np.array([0.4, 0.0, -0.25]), quat=np.array([0, 1, 0, 0]))
+    qpos_goal[-2:] = 0.0
+
+    cube_pos = cube.get_pos().clone()
+    cube_quat = cube.get_quat().clone()
+    _, valid = franka.plan_path(
+        qpos_goal=qpos_goal,
+        num_waypoints=50,
+        max_retry=0,
+        max_nodes=100,
+        ee_link_name="hand",
+        with_entity=cube,
+        return_valid_mask=True,
+    )
+    assert not bool(valid)  # the scenario under test is a failed plan
+    assert_allclose(cube.get_pos(), cube_pos, tol=tol)
+    assert_allclose(cube.get_quat(), cube_quat, tol=tol)
+
+
+@pytest.mark.required
 def test_all_fixed(show_viewer):
     scene = gs.Scene(
         sim_options=gs.options.SimOptions(
